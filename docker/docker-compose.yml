@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # CPU-based pipeline
+  wes-pipeline-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    image: wes-pipeline:cpu
+    container_name: wes-pipeline-cpu
+    volumes:
+      - ../:/pipeline
+      - ./data:/data
+      - ./results:/results
+      - ./reference:/reference
+    working_dir: /pipeline
+    command: bash
+    environment:
+      - NXF_HOME=/pipeline/.nextflow
+    stdin_open: true
+    tty: true
+
+  # GPU-based pipeline
+  wes-pipeline-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: wes-pipeline:gpu
+    container_name: wes-pipeline-gpu
+    volumes:
+      - ../:/pipeline
+      - ./data:/data
+      - ./results:/results
+      - ./reference:/reference
+    working_dir: /pipeline
+    command: bash
+    environment:
+      - NXF_HOME=/pipeline/.nextflow
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Nextflow service (CPU)
+  nextflow-cpu:
+    image: wes-pipeline:cpu
+    container_name: nextflow-wes-cpu
+    volumes:
+      - ../:/pipeline
+      - ./data:/data
+      - ./results:/results
+      - ./reference:/reference
+    working_dir: /pipeline
+    environment:
+      - NXF_HOME=/pipeline/.nextflow
+    command: >
+      bash -c "
+      conda run -n wes nextflow run main.nf
+      --input /data/samples.csv
+      --outdir /results
+      --reference hg38
+      --bed /data/targets.bed
+      --compute_mode cpu
+      --reference_dir /reference
+      -profile standard
+      -resume
+      "
+
+  # Nextflow service (GPU)
+  nextflow-gpu:
+    image: wes-pipeline:gpu
+    container_name: nextflow-wes-gpu
+    volumes:
+      - ../:/pipeline
+      - ./data:/data
+      - ./results:/results
+      - ./reference:/reference
+    working_dir: /pipeline
+    environment:
+      - NXF_HOME=/pipeline/.nextflow
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      bash -c "
+      conda run -n wes nextflow run main.nf
+      --input /data/samples.csv
+      --outdir /results
+      --reference hg38
+      --bed /data/targets.bed
+      --compute_mode gpu
+      --reference_dir /reference
+      -profile gpu_multi
+      -resume
+      "

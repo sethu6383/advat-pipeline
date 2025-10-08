@@ -1,0 +1,124 @@
+#=============================================================================
+# MultiQC Configuration for WES Pipeline
+#=============================================================================
+
+# Report title and intro
+title: "WES Pipeline QC Report"
+subtitle: "Whole Exome Sequencing Quality Control"
+intro_text: "This report contains quality control metrics for the WES pipeline analysis."
+
+# Report customization
+report_header_info:
+  - Pipeline: 'WES Pipeline v1.0.0'
+  - Contact: 'your-email@example.com'
+
+# Module order
+module_order:
+  - fastqc:
+      name: 'FastQC (Raw)'
+      info: 'Quality metrics for raw sequencing reads'
+      path_filters:
+        - '**/qc/raw/fastqc/*.zip'
+  - fastp:
+      name: 'fastp'
+      info: 'Adapter trimming and quality filtering'
+  - fastqc:
+      name: 'FastQC (Trimmed)'
+      info: 'Quality metrics after trimming'
+      path_filters:
+        - '**/qc/trimmed/fastqc/*.zip'
+  - picard:
+      name: 'Picard Metrics'
+      info: 'Alignment and coverage metrics'
+  - samtools:
+      name: 'Samtools'
+      info: 'BAM/CRAM statistics'
+  - bcftools:
+      name: 'BCFtools'
+      info: 'Variant calling statistics'
+
+# Custom data sections
+custom_data:
+  coverage_metrics:
+    id: 'coverage_metrics'
+    section_name: 'Target Coverage Summary'
+    description: 'Coverage statistics for target regions'
+    plot_type: 'table'
+    pconfig:
+      id: 'coverage_table'
+      title: 'Coverage Metrics'
+
+# Table columns configuration
+table_columns_visible:
+  FastQC:
+    percent_duplicates: True
+    percent_gc: True
+    avg_sequence_length: True
+    total_sequences: True
+  Picard:
+    PERCENT_DUPLICATION: True
+    PCT_PF_READS_ALIGNED: True
+    MEAN_TARGET_COVERAGE: True
+    PCT_TARGET_BASES_30X: True
+    PCT_TARGET_BASES_100X: True
+  Samtools:
+    mapped_passed: True
+    error_rate: True
+    average_quality: True
+
+# File name cleaning
+fn_clean_exts:
+  - '.fastq'
+  - '.fastq.gz'
+  - '.fq'
+  - '.fq.gz'
+  - '.bam'
+  - '.sam'
+  - '.cram'
+  - '.vcf'
+  - '.vcf.gz'
+  - '_R1'
+  - '_R2'
+  - '_001'
+
+# Sample name cleaning
+fn_clean_trim:
+  - '.fastq'
+  - '.fq'
+  - '_trimmed'
+  - '_sorted'
+  - '_dedup'
+  - '_recal'
+  - '_raw'
+  - '_filtered'
+
+# Ignore patterns
+fn_ignore_paths:
+  - '*/work/*'
+  - '*/.nextflow/*'
+  - '*/temp/*'
+  - '*/tmp/*'
+
+# Report appearance
+custom_logo: null
+custom_logo_url: null
+custom_logo_title: null
+
+# Extra CSS
+extra_fn_clean_exts:
+  - type: 'remove'
+    pattern: '.markdup'
+  - type: 'remove'
+    pattern: '.hsmetrics'
+
+# Report saving
+make_data_dir: True
+zip_data_dir: True
+data_format: 'json'
+
+# Export plots
+export_plots: True
+
+# Performance
+use_filename_as_sample_name: False
+prepend_dirs: False

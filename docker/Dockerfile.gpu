@@ -1,0 +1,112 @@
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+LABEL maintainer="your-email@example.com"
+LABEL description="WES Pipeline - GPU Version with Parabricks"
+LABEL version="1.0.0"
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    bzip2 \
+    ca-certificates \
+    git \
+    libz-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libncurses5-dev \
+    build-essential \
+    cmake \
+    python3 \
+    python3-pip \
+    openjdk-17-jdk \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Java environment
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Install Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh
+ENV PATH=/opt/conda/bin:$PATH
+
+# Create conda environment
+RUN conda config --add channels defaults && \
+    conda config --add channels bioconda && \
+    conda config --add channels conda-forge && \
+    conda create -n wes python=3.10 -y
+
+# Activate conda environment
+SHELL ["conda", "run", "-n", "wes", "/bin/bash", "-c"]
+
+# Install bioinformatics tools via conda
+RUN conda install -n wes -y \
+    fastqc=0.12.1 \
+    fastp=0.23.4 \
+    samtools=1.18 \
+    bcftools=1.18 \
+    bedtools=2.31.0 \
+    tabix=1.11 \
+    multiqc=1.15
+
+# Install GATK
+RUN wget https://github.com/broadinstitute/gatk/releases/download/4.4.0.0/gatk-4.4.0.0.zip -O /tmp/gatk.zip && \
+    unzip /tmp/gatk.zip -d /opt/ && \
+    rm /tmp/gatk.zip && \
+    ln -s /opt/gatk-4.4.0.0/gatk /usr/local/bin/gatk
+
+# Install Picard
+RUN wget https://github.com/broadinstitute/picard/releases/download/3.1.0/picard.jar -O /opt/picard.jar && \
+    echo '#!/bin/bash' > /usr/local/bin/picard && \
+    echo 'java -jar /opt/picard.jar "$@"' >> /usr/local/bin/picard && \
+    chmod +x /usr/local/bin/picard
+
+# Install ExpansionHunter
+RUN wget https://github.com/Illumina/ExpansionHunter/releases/download/v5.0.0/ExpansionHunter-v5.0.0-linux_x86_64.tar.gz -O /tmp/eh.tar.gz && \
+    tar -xzf /tmp/eh.tar.gz -C /opt/ && \
+    rm /tmp/eh.tar.gz && \
+    ln -s /opt/ExpansionHunter-v5.0.0-linux_x86_64/bin/ExpansionHunter /usr/local/bin/ExpansionHunter
+
+# Download ExpansionHunter variant catalog
+RUN mkdir -p /opt/expansion_hunter_catalogs && \
+    wget https://github.com/Illumina/RepeatCatalogs/raw/master/hg38/variant_catalog.json \
+    -O /opt/expansion_hunter_catalogs/hg38_variant_catalog.json
+
+# Install NVIDIA Parabricks
+# NOTE: Parabricks requires registration/license. Instructions:
+# 1. Register at: https://www.nvidia.com/en-us/clara/genomics/
+# 2. Download Parabricks installer
+# 3. Place in docker build context and uncomment below:
+#
+# COPY parabricks_*.tar.gz /tmp/
+# RUN tar -xzf /tmp/parabricks_*.tar.gz -C /opt/ && \
+#     rm /tmp/parabricks_*.tar.gz
+# ENV PATH=/opt/parabricks:$PATH
+#
+# OR use Clara Parabricks free version (limited features):
+RUN echo "#!/bin/bash" > /usr/local/bin/pbrun && \
+    echo "echo 'Parabricks placeholder - Install full version for GPU acceleration'" >> /usr/local/bin/pbrun && \
+    echo "echo 'Visit: https://www.nvidia.com/en-us/clara/genomics/'" >> /usr/local/bin/pbrun && \
+    echo "exit 1" >> /usr/local/bin/pbrun && \
+    chmod +x /usr/local/bin/pbrun
+
+# Make conda environment available
+RUN echo "conda activate wes" >> ~/.bashrc
+
+# Set working directory
+WORKDIR /data
+
+# Set entrypoint to use conda environment
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "wes"]
+CMD ["/bin/bash"]
